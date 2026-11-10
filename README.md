@@ -1,5 +1,8 @@
 # 钢材表面缺陷识别：HOG+SVM / BaseCNN / CBAM-CNN 三级对比
 
+**在线体验（免安装，点开即用）**：https://yukhughkui.github.io/steel-defect-detection-cbam/
+—— 上传一张钢材表面图即可识别六类缺陷，模型在浏览器本地运行。
+
 基于 NEU-DET 数据集（热轧带钢 6 类表面缺陷，1800 幅 200×200 灰度图）的对比研究型实验：
 传统手工特征（HOG+SVM）→ 轻量卷积网络（BaseCNN）→ 注意力增强网络（CBAM-CNN），
 外加小样本实验与 Grad-CAM 可解释性分析。

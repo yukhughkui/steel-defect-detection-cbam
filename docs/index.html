@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>钢材表面缺陷识别 · 在线演示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f4f5f7; color: #2c2c2a; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; padding: 32px 16px;
+  }
+  .card {
+    background: #fff; border-radius: 14px; max-width: 760px; width: 100%;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08); padding: 22px 24px;
+  }
+  h1 { font-size: 20px; font-weight: 600; }
+  .sub { font-size: 13px; color: #888780; margin-top: 6px; line-height: 1.6; }
+  .grid { display: flex; gap: 22px; margin-top: 18px; flex-wrap: wrap; }
+  .left, .right { flex: 1 1 280px; }
+  #view {
+    width: 100%; aspect-ratio: 1; background: #f1efe8; border: 1.5px solid #d3d1c7;
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    color: #888780; font-size: 13px; overflow: hidden;
+  }
+  #view img { width: 100%; height: 100%; object-fit: contain; background: #14141a; }
+  .btns { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  button, label.btn {
+    border: none; border-radius: 9px; padding: 10px 18px; font-size: 14px; cursor: pointer;
+    background: #2c2c2a; color: #fff; transition: opacity .15s;
+  }
+  button.ghost, label.ghost { background: #f1efe8; color: #444441; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  input[type=file] { display: none; }
+  .result { min-height: 120px; }
+  .top { font-size: 26px; font-weight: 600; }
+  .top small { font-size: 14px; color: #5f5e5a; font-weight: 400; margin-left: 8px; }
+  .bars { margin-top: 14px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12.5px; }
+  .bar-name { width: 110px; color: #444441; }
+  .bar-track { flex: 1; height: 10px; background: #f1efe8; border-radius: 5px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #888780; border-radius: 5px; transition: width .25s; }
+  .bar-top .bar-fill { background: #1d9e75; }
+  .bar-top .bar-name { color: #0f6e56; font-weight: 600; }
+  .bar-v { width: 46px; text-align: right; color: #888780; font-variant-numeric: tabular-nums; }
+  .status { font-size: 13px; color: #888780; margin-top: 10px; }
+  footer { font-size: 12px; color: #888780; margin-top: 18px; line-height: 1.7; text-align: center; }
+  a { color: #5f5e5a; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>钢材表面缺陷识别</h1>
+  <div class="sub">CBAM 注意力卷积网络（NEU-DET 六类） · 推理在你的浏览器本地完成 ·
+  上传一张钢材表面图，或点「载入样本」</div>
+
+  <div class="grid">
+    <div class="left">
+      <div id="view">等待图片 —— 上传图片或载入样本</div>
+      <div class="btns">
+        <label class="btn" for="file">上传图片</label>
+        <label class="btn ghost" for="sampleFile">载入样本</label>
+        <input type="file" id="file" accept="image/*">
+        <input type="file" id="sampleFile" accept="image/*">
+      </div>
+    </div>
+    <div class="right">
+      <div class="result">
+        <div class="top" id="top">–<small id="topConf"></small></div>
+        <div class="bars" id="bars"></div>
+        <div class="status" id="status">正在加载模型……</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  数据集 <a href="https://github.com/Marfbin/NEU-DET-with-yolov8" target="_blank">NEU-DET</a>
+  · 模型与实验见 <a href="https://github.com/yukhughkui/steel-defect-detection-cbam" target="_blank">GitHub 仓库</a>
+  · 链路：灰度 128×128 → CBAM-CNN → Softmax
+</footer>
+
+<script src="ort/ort.min.js"></script>
+<script src="samples.js"></script>
+<script>
+const CLASSES = ['crazing', 'inclusion', 'patches', 'pitted_surface', 'rolled-in_scale', 'scratches'];
+const CN = { crazing: '裂纹', inclusion: '夹杂', patches: '斑块',
+             pitted_surface: '麻点', 'rolled-in_scale': '氧化铁皮压入', scratches: '划痕' };
+const view = document.getElementById('view'), bars = document.getElementById('bars');
+const topEl = document.getElementById('top'), topConf = document.getElementById('topConf');
+const statusEl = document.getElementById('status');
+let session = null, currentImg = null;
+
+ort.env.wasm.numThreads = 1;
+ort.env.wasm.wasmPaths = new URL('ort/', location.href).href;
+(async () => {
+  try {
+    session = await ort.InferenceSession.create('cbam_cnn.onnx');
+    statusEl.textContent = '模型就绪';
+  } catch (e) { statusEl.textContent = '模型加载失败：' + e.message; }
+})();
+
+const ORDER = Object.keys(CN);
+function render(probs) {
+  const idx = probs.indexOf(Math.max(...probs));
+  topEl.firstChild.textContent = CN[ORDER[idx]];
+  topConf.textContent = (probs[idx] * 100).toFixed(1) + '%';
+  bars.innerHTML = ORDER.map((c, i) =>
+    `<div class="bar-row${i === idx ? ' bar-top' : ''}">
+       <span class="bar-name">${CN[c]}（${c}）</span>
+       <span class="bar-track"><span class="bar-fill" style="width:${(probs[i] * 100).toFixed(1)}%"></span></span>
+       <span class="bar-v">${(probs[i] * 100).toFixed(1)}%</span>
+     </div>`).join('');
+}
+
+async function recognize(source, sw, sh) {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(source, 0, 0, 128, 128);
+  const d = g.getImageData(0, 0, 128, 128).data;
+  const f = new Float32Array(128 * 128);
+  for (let i = 0; i < 128 * 128; i++) {
+    f[i] = (0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2]) / 255;  // PIL convert('L')
+  }
+  const out = await session.run({ input: new ort.Tensor('float32', f, [1, 1, 128, 128]) });
+  const logits = out[Object.keys(out)[0]].data;
+  const mx = Math.max(...logits);
+  const e = logits.map(v => Math.exp(v - mx)), s = e.reduce((a, b) => a + b);
+  render(e.map(v => v / s));
+}
+
+function showAndRun(source, sw, sh) {
+  let img = currentImg;
+  if (source.tagName !== 'IMG') {
+    img = new Image(); img.src = source.toDataURL();
+    img.onload = () => { view.innerHTML = ''; view.appendChild(img); recognize(img, sw, sh); };
+  } else {
+    view.innerHTML = ''; view.appendChild(source);
+    recognize(source, sw, sh);
+  }
+}
+
+document.getElementById('file').onchange = e => {
+  if (!session || !e.target.files.length) return;
+  const img = new Image();
+  img.onload = () => { currentImg = img; showAndRun(img, img.naturalWidth, img.naturalHeight); };
+  img.src = URL.createObjectURL(e.target.files[0]);
+  e.target.value = '';
+};
+
+document.getElementById('sampleFile').onchange = e => {
+  if (!session || !e.target.files.length) return;
+  const f = e.target.files[0];
+  const img = new Image();
+  img.onload = () => { currentImg = img; showAndRun(img, img.naturalWidth, img.naturalHeight); };
+  img.src = URL.createObjectURL(f);
+  e.target.value = '';
+};
+
+// 「载入样本」按钮：随机加载一张数据集测试图（由 samples.js 提供）
+const sampleLabel = document.querySelector('label.ghost[for="sampleFile"]');
+sampleLabel.onclick = () => {
+  if (!session) return;
+  const s = SAMPLES[Math.floor(Math.random() * SAMPLES.length)];
+  const img = new Image();
+  img.onload = () => { currentImg = img; showAndRun(img, 200, 200); };
+  img.src = s.img;
+};
+</script>
+</body>
+</html>
