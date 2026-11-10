@@ -1,0 +1,71 @@
+{
+  "method": "HOG + SVM (RBF, C=10)",
+  "feature_dim": 1764,
+  "n_train": 1620,
+  "n_test": 180,
+  "accuracy": 0.8833333333333333,
+  "precision_macro": 0.8838500683200813,
+  "recall_macro": 0.8833333333333333,
+  "f1_macro": 0.8828056159514012,
+  "confusion_matrix": [
+    [
+      30,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      26,
+      0,
+      2,
+      0,
+      2
+    ],
+    [
+      1,
+      0,
+      22,
+      7,
+      0,
+      0
+    ],
+    [
+      0,
+      2,
+      5,
+      23,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0,
+      0,
+      29,
+      0
+    ],
+    [
+      0,
+      1,
+      0,
+      0,
+      0,
+      29
+    ]
+  ],
+  "classes": [
+    "crazing",
+    "inclusion",
+    "patches",
+    "pitted_surface",
+    "rolled-in_scale",
+    "scratches"
+  ],
+  "feature_time_s": 37.3,
+  "train_time_s": 0.5,
+  "infer_time_ms_per_img": 0.85
+}

@@ -1,0 +1,12 @@
+# 数据集与克隆的外部仓库不进版本库
+datasets/
+neudet_repo/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 编辑器
+.idea/
+.ipynb_checkpoints/
+src/build_paper.py
